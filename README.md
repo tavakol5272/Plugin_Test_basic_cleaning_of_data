@@ -1,101 +1,70 @@
-# Name of App *(Give your app a short and informative title. Please adhere to our convention of Title Case without hyphens (e.g. My New App))*
+# Remove Invalid and Duplicate Locations
 
 MoveApps
 
-Github repository: *github.com/yourAccount/Name-of-App* *(provide the link to the repository where the code of the App can be found)*
-
-*(Note: all text in italics are instructions for filling out this template. Please replace or delete them before publishing your App.)*
-
-*(Optional, but very helpful for Users: add here a screenshot or example figure of a typical result of the App, e.g. a plot, a map or a table. Save the image in the repository (e.g. in a folder `documentation/`) and include it with:*
-<p align="center">
-  <img alt="Screenshot of the Apps UI" src="documentation/screenshot_UI.png" width="600">
-</p>
-*)*
+Github repository: 
 
 ## Description
-*Enter here the short description of the App that might also be used when filling out the description during App submission to MoveApps. This text is directly presented to Users that look through the list of Apps when compiling Workflows.*
+Cleans location data by removing empty locations, locations with a missing longitude/X or latitude/Y coordinate, locations at exactly (0, 0), and duplicated track/timestamp records (keeping the record with the fewest missing values). Provides the cleaned data and a per-track summary of how many locations were removed.
 
 ## Documentation
-*Enter here a detailed description of your App. What is it intended to be used for. Which steps of analyses are performed and how. Please be explicit about any detail that is important for use and understanding of the App and its outcomes. You might also refer to the sections below.*
+This App performs a basic cleaning of movement (location) data, so that later Apps in the Workflow receive data without invalid or duplicated locations. The following steps are applied, in this order, to the whole data set:
+
+1. **Ordering:** if the data are not grouped by track, they are reordered by track. If the locations are not ordered by time within each track, they are reordered by time within each track.
+2. **Empty locations:** locations without geometry (empty points) are removed.
+3. **Missing coordinates:** locations where only one of the two coordinates (X/longitude or Y/latitude) is missing (`NA`) are removed.
+4. **(0, 0) coordinates:** locations where both coordinates are exactly `0` are removed. Such locations are a common error of tracking devices.
+5. **Duplicated records:** if a track contains more than one location with the same timestamp, only one of them is kept: the record with the fewest missing values (`NA`) across all columns. If several records have the same number of missing values, the first one is kept. The data are then ordered again by track and time.
+
+For each step, the number of removed locations is written to the log. At the end, a summary table with the number of removed locations per step and per track, together with some basic statistics of the cleaned data, is written to the log and saved as a csv-file (see Artefacts). The cleaned data are passed on to the next App and are also saved as an `.rds` file. The run time of the cleaning is written to the log.
+
+Note that the **Movebank Location** App already removes empty locations, locations with missing coordinates and duplicated records when downloading data. This App is useful for data from other sources (e.g. uploaded files) and additionally removes locations at (0, 0).
 
 ### Application scope
 #### Generality of App usability
-*State here if the App was developed for a specific species, taxon or taxonomic group, or to answer a specific question. How might it influence the scope and utility of the App. This information will help the user to understand why the App might be producing no or odd results.*
-
-*Examples:*
-
-This App was developed for any taxonomic group. 
-
-This App was developed using data of birds. 
-
-This App was developed using data of red deer. 
-
-This App was developed to identify kill sites, but can probably be used to identify any kind of location clusters like nests, dens or drinking holes.
+This App was developed for any taxonomic group.
 
 #### Required data properties
-*State here the required and/or optimal data properties for this App to perform properly.*
+The App should work for any kind of location data.
 
-*Examples:*
-
-This App is only applicable to data that reflect range resident behavior. 
-
-The data should have a fix rate of at least 1 location per 30 minutes. 
-
-The App should work for any kind of (location) data.
+The removal of (0, 0) coordinates is meant for data in geographic coordinates (longitude/latitude). If the data have been projected to another coordinate reference system (e.g. in metres), the point (0, 0) can be a valid location and would still be removed.
 
 ### Input type
-*Indicate which type of input data the App requires.*
-
-*Example:* `move2::move2_loc`
+`move2::move2_loc`
 
 ### Output type
-*Indicate which type of output data the App produces to be passed on to subsequent Apps.*
-
-*Example:* `move2::move2_loc`
+`move2::move2_loc`
 
 ### Artefacts
-*If the App creates artefacts (e.g. csv, pdf, jpeg, shapefiles, etc), please list them here and describe each.*
+`cleaned_data.rds`: the cleaned data as a `move2` object, identical to the output passed on to the next App. Only created if locations remain after cleaning.
 
-*Example:* `rest_overview.csv`: csv-file with Table of all rest site properties
+`cleaning_summary.csv`: csv-file with a table of the cleaning results, with one row per track and a final row `ALL` with the results over the whole data set. Columns:
+- `track_id`: name of the track (`ALL` for the whole data set)
+- `n_input`: number of locations before cleaning
+- `n_empty`: number of empty locations removed
+- `n_na_coords`: number of locations removed because the X or Y coordinate was missing
+- `n_zero`: number of locations at (0, 0) removed
+- `n_duplicates`: number of duplicated track/timestamp records removed
+- `n_removed`: total number of locations removed
+- `n_output`: number of locations after cleaning
+- `pct_removed`: percentage of locations removed
+- `first_time`: first timestamp after cleaning (UTC)
+- `last_time`: last timestamp after cleaning (UTC)
+- `median_time_lag_min`: median time between consecutive locations after cleaning. Unit: `minutes`. For the row `ALL`, the median of all time lags within tracks.
 
-### Settings 
-*Please list and define all settings/parameters that the App requires to be set by the App user, if necessary including their unit. Please first state the Setting name the user encounters in the Settings menu defined in the `appspec.json`, and between brackets the argument name used in the code of the R function, to be able to identify it quickly in the code if needed. Please also state the default value, if there is one.*
-
-*Example:* `Radius of resting site` (radius): Defined radius the animal has to stay in for a given duration of time for it to be considered resting site. Unit: `metres`. Default: `1000`.
+### Settings
+This App has no settings.
 
 ### Changes in output data
-*Specify here how and if the App modifies the input data. Describe clearly what e.g. each additional column means.*
-
-*Examples:*
-
-The App adds to the input data the columns `Max_dist` and `Avg_dist`. They contain the maximum distance to the provided focal location and the average distance to it over all locations. 
-
-The App filters the input data as selected by the user. 
-
-The output data is the outcome of the model applied to the input data. 
-
-The input data remains unchanged.
+The App removes locations from the input data: empty locations, locations with a missing coordinate, locations at (0, 0) and duplicated track/timestamp records. The data are ordered by track and by time within track. No columns are added or removed.
 
 ### Errors and null handling
-*Please describe here the most common errors of the App: how they occur and the best ways of solving them. You can also indicate for settings, as well as for the input data, which behaviour the App is supposed to show in case of errors or NULL values/input, including possible errors that can happen if settings/parameters are improperly set. Add here also any other important information that you find the User should be aware of.*
+**Input data:** If no locations remain after cleaning (e.g. all locations are at (0, 0)), the App writes a warning to the log and returns `NULL`. The summary table `cleaning_summary.csv` is still created, while `cleaned_data.rds` is not.
 
-*Examples:*
-
-**Setting `radius`:** If no radius AND no duration are given, the input data set is returned with a warning. If no radius is given (NULL), but a duration is defined then a default radius of 1000m = 1km is set. 
-
-**Input data:** If the input data contain fewer than 3 locations per track, the App stops with an error message stating which tracks are affected.
-
-**Common error:** If the App is used on data with a very low fix rate, no resting sites are found and the App returns an empty data set. Adapt the settings `radius` and `duration` to the resolution of your data.
+**Tracks without remaining locations:** If all locations of a track are removed, the track is still listed in `cleaning_summary.csv` with `n_output = 0` and empty values for `first_time`, `last_time` and `median_time_lag_min`. The same applies to `median_time_lag_min` for tracks with only one remaining location.
 
 ### Technical details
-*Optional, but recommended. Summarize here how the App works "under the hood", so that Users and developers can get a quick idea of the methods, dependencies and assumptions without having to read the code. Keep it short (a few sentences or bullet points) and mention only what is not already obvious from the sections above.*
-
-*Suggested points to cover:*
-
-- *The main library/package(s) the core calculation relies on, ideally naming the central function(s) (e.g. `move2`, `sf`, `amt`, `ctmm`, `lme4`).*
-- *The method or algorithm applied, and the reference/publication it is based on, if any.*
-- *Assumptions made in the code (e.g. the locations are assumed to be independent).*
-- *The level at which the data are processed (e.g. per track/individual, per track and year, on the whole data set at once).*
-- *Anything relevant for performance (e.g. runtime or memory increases strongly with the number of locations, parallelization).*
-- *Known simplifications or limitations of the implementation.*
-
+- The cleaning is based on the R packages `move2`, `sf` and `dplyr`. Duplicates are removed with `move2::mt_filter_unique(criterion = "first")` after ordering all records by their number of missing values.
+- The data are processed on the whole data set at once. The summary statistics are calculated per track.
+- The (0, 0) check uses the coordinates in the coordinate reference system of the input data. The data are not reprojected.
+- Timestamps in the summary table are given in UTC.
